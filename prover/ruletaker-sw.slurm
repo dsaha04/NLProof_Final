@@ -10,11 +10,12 @@
 #SBATCH --mail-type=begin        # send email when job begins
 #SBATCH --mail-type=end          # send email when job ends
 #SBATCH --mail-type=fail         # send email if job fails
-#SBATCH --mail-user=kh20@princeton.edu
+#SBATCH --mail-user=dsaha@princeton.edu
 
 module purge
 
 source ~/.bashrc
 conda activate nlproofs
+cd /scratch/network/dsaha/NLProof_Final/prover
 
 python main.py fit --config cli_ruletaker_stepwise_t5-small.yaml
