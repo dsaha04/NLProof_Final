@@ -5,8 +5,15 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import pytorch_lightning as pl
-import torchmetrics
 from transformers import AutoTokenizer, AutoModel
+from torchmetrics.classification import (
+    BinaryAccuracy,
+    BinaryAveragePrecision,
+    BinaryF1Score,
+    BinarySpecificity,
+    BinaryRecall,
+    BinaryPrecision,
+)
 
 
 class EntailmentClassifier(pl.LightningModule):
@@ -24,25 +31,27 @@ class EntailmentClassifier(pl.LightningModule):
         self.warmup_steps = warmup_steps
         self.pos_weight = pos_weight
         self.max_input_len = max_input_len
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name, model_max_length=max_input_len)
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            model_name, model_max_length=max_input_len
+        )
         self.encoder = AutoModel.from_pretrained(model_name)
         self.fc = nn.Linear(self.encoder.config.hidden_size, 1)
         self.metrics = {
             "train": {
-                "accuracy": torchmetrics.Accuracy(threshold=0),
-                "average_precision": torchmetrics.AveragePrecision(pos_label=1),
-                "precision": torchmetrics.Precision(),
-                "recall": torchmetrics.Recall(),
-                "specificity": torchmetrics.Specificity(),
-                "f1": torchmetrics.F1Score(),
+                "accuracy": BinaryAccuracy(),
+                "average_precision": BinaryAveragePrecision(pos_label=1),
+                "precision": BinaryPrecision(),
+                "recall": BinaryRecall(),
+                "specificity": BinarySpecificity(),
+                "f1": BinaryF1Score(),
             },
             "val": {
-                "accuracy": torchmetrics.Accuracy(threshold=0),
-                "average_precision": torchmetrics.AveragePrecision(pos_label=1),
-                "precision": torchmetrics.Precision(),
-                "recall": torchmetrics.Recall(),
-                "specificity": torchmetrics.Specificity(),
-                "f1": torchmetrics.F1Score(),
+                "accuracy": BinaryAccuracy(),
+                "average_precision": BinaryAveragePrecision(pos_label=1),
+                "precision": BinaryPrecision(),
+                "recall": BinaryRecall(),
+                "specificity": BinarySpecificity(),
+                "f1": BinaryF1Score(),
             },
         }
         for split, metrics in self.metrics.items():
@@ -50,7 +59,7 @@ class EntailmentClassifier(pl.LightningModule):
                 self.add_module(f"{name}_{split}", m)
 
     def log_metrics(self, split: str, logit: torch.Tensor, label: torch.Tensor) -> None:
-        for (name, metric) in self.metrics[split].items():
+        for name, metric in self.metrics[split].items():
             metric(logit, label)
             self.log(f"{name}_{split}", metric, on_step=False, on_epoch=True)
 
@@ -87,7 +96,7 @@ class EntailmentClassifier(pl.LightningModule):
         assert self.trainer is not None
         if self.trainer.max_steps != -1:
             max_steps = self.trainer.max_steps
-        else: 
+        else:
             max_steps = (
                 self.trainer.max_epochs
                 * len(self.trainer.datamodule.train_dataloader())  # type: ignore
@@ -131,4 +140,5 @@ class EntailmentClassifier(pl.LightningModule):
         input_ids = entailment.input_ids.to(self.device)
         attention_mask = entailment.attention_mask.to(self.device)
         logits = torch.sigmoid(self(input_ids, attention_mask))
-        return logits.detach().cpu().numpy()  # type: ignore
+        # return logits.detach().cpu().numpy()  # type: ignore
+        return logits.detach().to(dtype=torch.float32, device="cpu").numpy()  # type: ignore
